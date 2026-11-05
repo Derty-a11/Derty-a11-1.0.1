@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>ᚱ Рунный кликер</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{
+    --line:#e9ecf1; --text:#0f1419; --muted:#8a93a3;
+    --blue:#0a5cff; --green:#12a150; --danger:#e5484d;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;}
+  body{
+    height:100dvh;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    color:var(--text);background:#fff;
+    overflow:hidden;user-select:none;-webkit-user-select:none;
+    touch-action:manipulation;
+  }
+
+  /* ---------- ФОН ---------- */
+  .bg{
+    position:fixed;inset:0;z-index:0;
+    background-size:cover;background-position:center;background-repeat:no-repeat;
+    background-color:#fff;
+  }
+  .scrim{
+    position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:rgba(255,255,255,.76);
+    opacity:0;transition:opacity .25s;
+  }
+  .scrim.on{opacity:1;}
+
+  .app{
+    position:relative;z-index:1;height:100dvh;
+    display:flex;flex-direction:column;overflow:hidden;
+  }
+
+  /* ---------- ШАПКА ---------- */
+  .top{position:relative;padding:16px 18px 4px;flex:none;}
+  .menu-btn{
+    position:absolute;top:12px;right:14px;width:38px;height:38px;
+    border-radius:13px;border:1.5px solid var(--line);background:#fff;
+    font-size:16px;line-height:1;display:grid;place-items:center;
+    color:var(--text);cursor:pointer;
+    box-shadow:0 2px 8px rgba(15,20,25,.06);
+    transition:transform .1s ease, border-color .15s;
+  }
+  .menu-btn:active{transform:scale(.93);border-color:#c9dcff;}
+
+  .bal{
+    text-align:center;font-size:38px;font-weight:800;
+    letter-spacing:-1.2px;font-variant-numeric:tabular-nums;
+    padding:0 44px;line-height:1.15;
+  }
+  .bal .cur{
+    font-size:14px;font-weight:700;color:var(--muted);
+    margin-left:6px;letter-spacing:0;
+  }
+  .per-sec{
+    text-align:center;color:var(--green);font-size:12.5px;
+    font-weight:700;height:17px;margin-top:1px;
+  }
+
+  .lvl-row{display:flex;align-items:center;gap:8px;margin-top:12px;}
+  .lvl-badge{
+    font-size:12px;font-weight:800;background:#eef3ff;color:var(--blue);
+    padding:4px 9px;border-radius:9px;white-space:nowrap;
+    transition:background .2s,color .2s;
+  }
+  .lvl-badge.up{background:var(--blue);color:#fff;}
+  .bar{flex:1;height:8px;background:#eef1f5;border-radius:99px;overflow:hidden;}
+  .bar-fill{
+    height:100%;width:0;border-radius:99px;
+    background:linear-gradient(90deg,#4d8bff,#0a5cff);
+    transition:width .25s ease;
+  }
+  .lvl-xp{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;}
+
+  /* ---------- МОНЕТА ---------- */
+  .coin-wrap{
+    flex:1;display:grid;place-items:center;
+    position:relative;min-height:0;padding:8px;
+  }
+  .coin{
+    width:min(64vw,240px);aspect-ratio:1;position:relative;cursor:pointer;
+    touch-action:manipulation;-webkit-touch-callout:none;
+    transition:transform .09s ease;
+    filter:
+      drop-shadow(0 16px 28px rgba(168,120,12,.32))
+      drop-shadow(0 3px 6px rgba(0,0,0,.10));
+  }
+  .coin-svg{width:100%;height:100%;display:block;pointer-events:none;}
+  .coin:active{transform:scale(.955);}
+  .coin.pop{animation:pop .2s ease;}
+  @keyframes pop{
+    0%{transform:scale(1)} 42%{transform:scale(.905)} 100%{transform:scale(1)}
+  }
+
+  .float{
+    position:absolute;pointer-events:none;font-weight:800;font-size:19px;
+    color:var(--green);transform:translate(-50%,-50%);
+    animation:fly .95s cubic-bezier(.2,.7,.3,1) forwards;
+    white-space:nowrap;z-index:5;
+    text-shadow:0 1px 3px rgba(255,255,255,.95),0 0 8px rgba(255,255,255,.8);
+  }
+  .float.crit{color:#ff8a00;font-size:26px;}
+  @keyframes fly{
+    0%{opacity:0;transform:translate(-50%,-50%) scale(.6);}
+    18%{opacity:1;transform:translate(-50%,-98%) scale(1.14);}
+    100%{opacity:0;transform:translate(-50%,-235%) scale(1);}
+  }
+
+  /* ---------- МАГАЗИН ---------- */
+  .shop{
+    flex:none;padding:6px 14px calc(14px + env(safe-area-inset-bottom));
+    display:flex;flex-direction:column;gap:8px;
+  }
+  .card{
+    display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+    background:#fff;border:1.5px solid var(--line);border-radius:16px;
+    padding:11px 14px;font-family:inherit;color:inherit;cursor:pointer;
+    box-shadow:0 2px 8px rgba(15,20,25,.04);
+    transition:transform .1s ease,border-color .15s,background .15s,opacity .15s;
+  }
+  .card:active:not(:disabled){transform:scale(.985);}
+  .card.can{border-color:#c9dcff;background:#f8fbff;}
+  .card:disabled{opacity:.45;cursor:default;}
+  .c-icon{
+    font-size:20px;width:36px;height:36px;flex:none;border-radius:11px;
+    display:grid;place-items:center;background:#f4f6fa;
+  }
+  .c-body{flex:1;min-width:0;}
+  .c-title{font-size:14px;font-weight:700;display:flex;gap:6px;align-items:center;}
+  .c-lvl{
+    font-size:11px;font-weight:800;color:var(--muted);
+    background:#f1f3f7;padding:1px 6px;border-radius:6px;
+  }
+  .c-effect{
+    font-size:12px;color:var(--muted);margin-top:2px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .c-cost{font-size:14px;font-weight:800;color:var(--blue);white-space:nowrap;}
+  .card:disabled .c-cost{color:var(--muted);}
+
+  /* ---------- МЕНЮ ---------- */
+  .backdrop{
+    position:fixed;inset:0;z-index:40;background:rgba(15,20,25,.38);
+    opacity:0;pointer-events:none;transition:opacity .22s;
+  }
+  .backdrop.on{opacity:1;pointer-events:auto;}
+
+  .sheet{
+    position:fixed;left:0;right:0;bottom:0;z-index:50;background:#fff;
+    border-radius:24px 24px 0 0;
+    padding:6px 18px calc(22px + env(safe-area-inset-bottom));
+    transform:translateY(112%);
+    transition:transform .3s cubic-bezier(.22,1,.36,1);
+    box-shadow:0 -10px 34px rgba(15,20,25,.18);
+    max-height:84dvh;overflow-y:auto;
+    overscroll-behavior:contain;
+  }
+  .sheet.on{transform:translateY(0);}
+  .grabber{
+    width:38px;height:4px;border-radius:99px;background:#e3e7ee;
+    margin:6px auto 12px;
+  }
+  .sheet-head{
+    display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;
+  }
+  .sheet-head h2{font-size:18px;font-weight:800;margin:0;letter-spacing:-.3px;}
+  .x-btn{
+    width:32px;height:32px;border-radius:10px;border:none;background:#f1f3f7;
+    color:var(--muted);font-size:15px;font-weight:700;cursor:pointer;
+    display:grid;place-items:center;
+  }
+  .x-btn:active{transform:scale(.92);}
+
+  .sheet-label{
+    font-size:12px;font-weight:800;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.6px;
+    margin:18px 0 10px;
+  }
+
+  .bg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  .swatch{
+    position:relative;height:62px;border-radius:14px;
+    border:2px solid var(--line);cursor:pointer;overflow:hidden;
+    background-size:cover;background-position:center;
+    transition:border-color .15s,transform .1s ease;
+    padding:0;font-family:inherit;
+  }
+  .swatch:active{transform:scale(.96);}
+  .swatch.sel{border-color:var(--blue);}
+  .swatch.sel::after{
+    content:'✓';position:absolute;right:5px;bottom:4px;
+    width:18px;height:18px;border-radius:50%;background:#fff;color:var(--blue);
+    font-size:11px;font-weight:900;display:grid;place-items:center;
+    box-shadow:0 1px 5px rgba(0,0,0,.18);
+  }
+  .swatch.upload{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:2px;background:#f7f9fc;border-style:dashed;color:var(--muted);
+  }
+  .up-plus{font-size:19px;font-weight:800;line-height:1;}
+  .up-hint{font-size:10.5px;font-weight:700;}
+
+  .danger-btn{
+    width:100%;margin-top:22px;padding:13px;border-radius:14px;
+    border:1.5px solid #ffd5d6;background:#fff5f5;color:var(--danger);
+    font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;
+  }
+  .danger-btn:active{transform:scale(.985);}
+</style>
+</head>
+<body>
+
+<div class="bg" id="bg"></div>
+<div class="scrim" id="scrim"></div>
+
+<div class="app">
+  <header class="top">
+    <button class="menu-btn" id="menuBtn" aria-label="Меню">☰</button>
+    <div class="bal">
+      <span id="balNum">0</span><span class="cur" id="curLabel">коинов</span>
+    </div>
+    <div class="per-sec" id="perSec"></div>
+    <div class="lvl-row">
+      <span class="lvl-badge" id="lvlBadge">Ур. 1</span>
+      <div class="bar"><div class="bar-fill" id="barFill"></div></div>
+      <span class="lvl-xp" id="lvlXp">0 / 3</span>
+    </div>
+  </header>
+
+  <main class="coin-wrap" id="coinWrap">
+    <div class="coin" id="coin">
+      <svg class="coin-svg" viewBox="0 0 200 200" aria-hidden="true">
+        <defs>
+          <radialGradient id="gGold" cx="34%" cy="27%" r="80%">
+            <stop offset="0%"   stop-color="#fffbe0"/>
+            <stop offset="22%"  stop-color="#ffe588"/>
+            <stop offset="50%"  stop-color="#f6c63f"/>
+            <stop offset="76%"  stop-color="#d99a13"/>
+            <stop offset="100%" stop-color="#a06c04"/>
+          </radialGradient>
+          <linearGradient id="gRim" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="#fff0b8"/>
+            <stop offset="42%"  stop-color="#e8b83e"/>
+            <stop offset="100%" stop-color="#8a5902"/>
+          </linearGradient>
+          <radialGradient id="gShine" cx="30%" cy="22%" r="52%">
+            <stop offset="0%"   stop-color="#ffffff" stop-opacity=".62"/>
+            <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+
+        <!-- обод -->
+        <circle cx="100" cy="100" r="98" fill="url(#gRim)"/>
+        <circle cx="100" cy="100" r="93" fill="url(#gGold)"/>
+        <circle cx="100" cy="100" r="93" fill="none"
+                stroke="#7d5203" stroke-opacity=".38" stroke-width="2"/>
+        <circle cx="100" cy="100" r="88" fill="none"
+                stroke="#fff6cf" stroke-opacity=".30" stroke-width="1"/>
+
+        <!-- кольцо под руны -->
+        <circle cx="100" cy="100" r="90" fill="none"
+                stroke="#7d5203" stroke-opacity=".20" stroke-width="1"/>
+        <circle cx="100" cy="100" r="67" fill="none"
+                stroke="#7d5203" stroke-opacity=".26" stroke-width="1.6"/>
+        <circle cx="100" cy="100" r="65.6" fill="none"
+                stroke="#fff6cf" stroke-opacity=".45" stroke-width="1"/>
+
+        <!-- руны по кругу (генерируются скриптом) -->
+        <g id="runesRing"></g>
+
+        <!-- центральная печать -->
+        <circle cx="100" cy="100" r="47" fill="none"
+                stroke="#7d5203" stroke-opacity=".22" stroke-width="1.4"/>
+        <g id="centerRune"></g>
+
+        <!-- блик -->
+        <circle cx="100" cy="100" r="93" fill="url(#gShine)" pointer-events="none"/>
+      </svg>
+    </div>
+  </main>
+
+  <section class="shop" id="shop"></section>
+</div>
+
+<div class="backdrop" id="backdrop"></div>
+
+<div class="sheet" id="sheet" role="dialog" aria-label="Меню">
+  <div class="grabber"></div>
+  <div class="sheet-head">
+    <h2>Меню</h2>
+    <button class="x-btn" id="sheetClose" aria-label="Закрыть">✕</button>
+  </div>
+
+  <div class="sheet-label">Фон приложения</div>
+  <div class="bg-grid" id="bgGrid">
+    <label class="swatch upload" id="uploadTile" data-kind="image">
+      <input type="file" accept="image/*" id="fileInput" hidden>
+      <span class="up-plus">+</span>
+      <span class="up-hint">Свой фон</span>
+    </label>
+  </div>
+
+  <button class="danger-btn" id="resetBtn">Сбросить прогресс</button>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ================= TELEGRAM ================= */
+  const tg = window.Telegram?.WebApp;
+  if (tg) {
+    tg.ready(); tg.expand();
+    try {
+      tg.setHeaderColor('#ffffff');
+      tg.setBackgroundColor('#ffffff');
+    } catch (e) {}
+  }
+  const haptic = {
+    tap:  () => tg?.HapticFeedback?.impactOccurred('light'),
+    buy:  () => tg?.HapticFeedback?.impactOccurred('medium'),
+    win:  () => tg?.HapticFeedback?.notificationOccurred('success'),
+    pick: () => tg?.HapticFeedback?.selectionChanged?.()
+  };
+
+  /* ================= КОНСТАНТЫ ================= */
+  const SAVE_KEY = 'rune_clicker_v2';
+  const BG_KEY   = 'rune_clicker_bg_v2';
+
+  const BASE_TAP  = 0.1;
+  const CRIT_MULT = 3;
+  const CRIT_MAX  = 10;
+  const HOLD_DELAY = 260;   // мс до старта автотапа
+  const HOLD_RATE  = 90;    // мс между автотапами (~11/сек)
+
+  const round1 = n => Math.round(n * 10) / 10;
+
+  /* ================= СОСТОЯНИЕ ================= */
+  const S = {
+    bal: 0,
+    tapLvl: 1,
+    critLvl: 0,
+    autoLvl: 0,
+    totalEarned: 0,
+    level: 1,
+    levelBase: 0,
+    levelNeed: 3,
+    ts: Date.now()
+  };
+
+  /* ================= МАТЕМАТИКА ================= */
+  const xpNeed      = lvl => round1(3 * Math.pow(1.55, lvl - 1));
+  const levelBonus  = () => 1 + (S.level - 1) * 0.1;
+  const tapValue    = () => BASE_TAP * S.tapLvl * levelBonus();
+  const nextTapVal  = () => BASE_TAP * (S.tapLvl + 1) * levelBonus();
+  const autoRate    = () => S.autoLvl * 0.2;
+  const critChance  = () => Math.min(S.critLvl * 0.05, 0.5);
+
+  const nf = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 });
+
+  function fmt(n) {
+    if (!Number.isFinite(n)) return '∞';
+    if (n >= 1e9) return (n / 1e9).toFixed(2).replace('.', ',') + ' млрд';
+    if (n >= 1e6) return (n / 1e6).toFixed(2).replace('.', ',') + ' млн';
+    if (n >= 1e5) return (n / 1e3).toFixed(1).replace('.', ',') + ' тыс';
+    return nf.format(n);
+  }
+
+  function plural(n) {
+    const a = Math.abs(n);
+    if (!Number.isInteger(a)) return 'коина';
+    const d = a % 10, h = a % 100;
+    if (d === 1 && h !== 11) return 'коин';
+    if (d >= 2 && d <= 4 && (h < 12 || h > 14)) return 'коина';
+    return 'коинов';
+  }
+
+  function recalcLevel() {
+    let lvl = 1, base = 0, need = xpNeed(1);
+    let guard = 0;
+    while (S.totalEarned >= base + need && guard++ < 2000) {
+      base += need; lvl++; need = xpNeed(lvl);
+    }
+    const leveled = lvl > S.level;
+    S.level = lvl; S.levelBase = base; S.levelNeed = need;
+    return leveled;
+  }
+
+  function addMoney(amount) {
+    if (!Number.isFinite(amount) || amount <= 0) return false;
+    S.bal += amount;
+    S.totalEarned += amount;
+    return recalcLevel();
+  }
+
+  /* ================= ПРОКАЧКИ ================= */
+  const UPG = {
+    tap: {
+      icon: '👆', title: 'Сила тапа',
+      lvl:  () => S.tapLvl,
+      cost: () => Math.max(2, round1(2 * Math.pow(1.65, S.tapLvl - 1))),
+      effect: () => `${fmt(tapValue())} → ${fmt(nextTapVal())} за тап`,
+      max:  () => false,
+      buy:  () => { S.tapLvl++; }
+    },
+    crit: {
+      icon: '⚡', title: 'Крит',
+      lvl:  () => S.critLvl,
+      cost: () => round1(25 * Math.pow(1.9, S.critLvl)),
+      effect: () => `${Math.round(critChance() * 100)}% шанс ×${CRIT_MULT}`,
+      max:  () => S.critLvl >= CRIT_MAX,
+      buy:  () => { S.critLvl++; }
+    },
+    auto: {
+      icon: '🤖', title: 'Авто-доход',
+      lvl:  () => S.autoLvl,
+      cost: () => round1(12 * Math.pow(1.75, S.autoLvl)),
+      effect: () => `${fmt(autoRate())} коина/сек`,
+      max:  () => false,
+      buy:  () => { S.autoLvl++; }
+    }
+  };
+
+  /* ================= DOM ================= */
+  const $ = id => document.getElementById(id);
+  const balNumEl = $('balNum'), curLabelEl = $('curLabel'), perSecEl = $('perSec');
+  const lvlBadge = $('lvlBadge'), barFill = $('barFill'), lvlXp = $('lvlXp');
+  const coin = $('coin'), coinWrap = $('coinWrap'), shop = $('shop');
+
+  /* ================= МОНЕТА: РУНЫ ================= */
+  const NS = 'http://www.w3.org/2000/svg';
+
+  // Знаки нарочно бессмысленные — просто гравировка по кругу.
+  const RUNE_PATHS = [
+    'M-3,-11V11M-3,-10L3,-3M-3,-3L3,4',
+    'M-4,-11V11L4,-8V11',
+    'M-3,-11V11M-3,-6L3,0L-3,6Z',
+    'M-2,-11V11M-2,-9L4,-3M-2,-3L4,3',
+    'M-3,-11V11M-3,-11L3,-9V-3L-3,-1M-3,-1L3,11',
+    'M3,-9L-3,0L3,9',
+    'M0,-11V11M0,-11L-5,-5M0,-11L5,-5',
+    'M-3,-11V11M-3,-11L3,-8V-4L-3,-1M-3,-1L3,2V6L-3,9',
+    'M0,11V-2M0,-2L-5,-11M0,-2L5,-11',
+    'M0,-11L5,-4L0,3L-5,-4ZM-5,-4L-6.5,11M5,-4L6.5,11',
+    'M4,-11L-4,-3L4,3L-4,11',
+    'M-4,-11L0,-6L4,-11M-4,11L0,6L4,11'
+  ];
+
+  function runePath(d, color, width, opacity, dx, dy) {
+    const p = document.createElementNS(NS, 'path');
+    p.setAttribute('d', d);
+    p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', color);
+    p.setAttribute('stroke-width', width);
+    p.setAttribute('stroke-linecap', 'round');
+    p.setAttribute('stroke-linejoin', 'round');
+    p.setAttribute('opacity', opacity);
+    if (dx || dy) p.setAttribute('transform', `translate(${dx} ${dy})`);
+    return p;
+  }
+
+  function buildRunes() {
+    const ring = $('runesRing');
+    const step = 360 / RUNE_PATHS.length;
+
+    RUNE_PATHS.forEach((d, i) => {
+      const g = document.createElementNS(NS, 'g');
+      g.setAttribute('transform', `rotate(${i * step} 100 100) translate(100 21)`);
+      g.appendChild(runePath(d, '#fff8dd', 2.2, .55, -0.7, -0.7)); // светлая фаска
+      g.appendChild(runePath(d, '#7a4f04', 2.2, .62, 0, 0));       // тёмная канавка
+      ring.appendChild(g);
+    });
+
+    // Центральная печать
+    const c = document.createElementNS(NS, 'g');
+    c.setAttribute('transform', 'translate(100 100) scale(2.5)');
+    c.appendChild(runePath(RUNE_PATHS[9], '#fff8dd', 1.4, .50, -0.3, -0.3));
+    c.appendChild(runePath(RUNE_PATHS[9], '#7a4f04', 1.4, .58, 0, 0));
+    $('centerRune').appendChild(c);
+  }
+
+  /* ================= РЕНДЕР ================= */
+  function buildShop() {
+    for (const [id, u] of Object.entries(UPG)) {
+      const card = document.createElement('button');
+      card.className = 'card';
+      card.type = 'button';
+      card.innerHTML =
+        `<div class="c-icon">${u.icon}</div>
+         <div class="c-body">
+           <div class="c-title">${u.title} <span class="c-lvl"></span></div>
+           <div class="c-effect"></div>
+         </div>
+         <div class="c-cost"></div>`;
+      card.addEventListener('click', () => buy(id));
+      shop.appendChild(card);
+      u.el = card;
+      u.lvlEl  = card.querySelector('.c-lvl');
+      u.effEl  = card.querySelector('.c-effect');
+      u.costEl = card.querySelector('.c-cost');
+    }
+  }
+
+  function renderShop() {
+    for (const u of Object.values(UPG)) {
+      const done = u.max();
+      const cost = u.cost();
+      const can  = !done && S.bal >= cost;
+      u.lvlEl.textContent  = 'ур. ' + u.lvl();
+      u.effEl.textContent  = done ? 'максимальный уровень' : u.effect();
+      u.costEl.textContent = done ? '—' : fmt(cost);
+      u.el.disabled = !can;
+      u.el.classList.toggle('can', can);
+    }
+  }
+
+  function render() {
+    balNumEl.textContent = fmt(S.bal);
+    curLabelEl.textContent = plural(Math.round(S.bal * 10) / 10);
+
+    const rate = autoRate();
+    perSecEl.textContent = rate > 0 ? `+${fmt(rate)} коина в секунду` : '';
+
+    lvlBadge.textContent = 'Ур. ' + S.level;
+    const prog = Math.max(0, S.totalEarned - S.levelBase);
+    barFill.style.width = Math.min(100, (prog / S.levelNeed) * 100) + '%';
+    lvlXp.textContent = `${fmt(prog)} / ${fmt(S.levelNeed)}`;
+
+    renderShop();
+  }
+
+  function renderBalanceOnly() {
+    balNumEl.textContent = fmt(S.bal);
+    curLabelEl.textContent = plural(Math.round(S.bal * 10) / 10);
+    const prog = Math.max(0, S.totalEarned - S.levelBase);
+    barFill.style.width = Math.min(100, (prog / S.levelNeed) * 100) + '%';
+    lvlXp.textContent = `${fmt(prog)} / ${fmt(S.levelNeed)}`;
+    lvlBadge.textContent = 'Ур. ' + S.level;
+  }
+
+  /* ================= ДЕЙСТВИЯ ================= */
+  function buy(id) {
+    const u = UPG[id];
+    if (u.max()) return;
+    const cost = u.cost();
+    if (S.bal < cost) return;
+    S.bal -= cost;
+    u.buy();
+    haptic.buy();
+    render();
+    save();
+  }
+
+  function onLevelUp() {
+    lvlBadge.classList.add('up');
+    setTimeout(() => lvlBadge.classList.remove('up'), 900);
+    haptic.win();
+  }
+
+  function spawnFloat(clientX, clientY, gain, crit) {
+    const r = coinWrap.getBoundingClientRect();
+    const el = document.createElement('div');
+    el.className = 'float' + (crit ? ' crit' : '');
+    el.textContent = `+${fmt(gain)}`;
+    el.style.left = (clientX - r.left) + 'px';
+    el.style.top  = (clientY - r.top)  + 'px';
+    coinWrap.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+  }
+
+  function doTap(x, y) {
+    const crit = Math.random() < critChance();
+    const gain = tapValue() * (crit ? CRIT_MULT : 1);
+    const leveled = addMoney(gain);
+
+    renderBalanceOnly();
+    renderShop();
+    spawnFloat(x, y, gain, crit);
+
+    coin.classList.remove('pop');
+    void coin.offsetWidth;
+    coin.classList.add('pop');
+
+    if (!holding) crit ? haptic.buy() : haptic.tap();
+    if (leveled) onLevelUp();
+    scheduleSave();
+  }
+
+  /* ================= ЗАЖИМ ================= */
+  let holdTimer = null, holdInterval = null;
+  let activePointer = null;
+  let holding = false;
+  let lastPos = { x: 0, y: 0 };
+
+  function startHold(e) {
+    if (activePointer !== null) return;          // второй палец игнорируем
+    activePointer = e.pointerId;
+    lastPos = { x: e.clientX, y: e.clientY };
+    try { coin.setPointerCapture(e.pointerId); } catch (err) {}
+
+    doTap(e.clientX, e.clientY);                 // мгновенный отклик
+
+    holdTimer = setTimeout(() => {
+      holding = true;
+      holdInterval = setInterval(() => {
+        const jx = lastPos.x + (Math.random() - 0.5) * 30;
+        const jy = lastPos.y + (Math.random() - 0.5) * 30;
+        doTap(jx, jy);
+      }, HOLD_RATE);
+    }, HOLD_DELAY);
+  }
+
+  function moveHold(e) {
+    if (e.pointerId !== activePointer) return;
+    lastPos = { x: e.clientX, y: e.clientY };
+  }
+
+  function stopHold(e) {
+    if (activePointer === null) return;
+    if (e && e.pointerId !== undefined && e.pointerId !== activePointer) return;
+
+    activePointer = null;
+    holding = false;
+    clearTimeout(holdTimer);  holdTimer = null;
+    clearInterval(holdInterval); holdInterval = null;
+  }
+
+  coin.addEventListener('pointerdown',  startHold);
+  coin.addEventListener('pointermove',  moveHold);
+  coin.addEventListener('pointerup',    stopHold);
+  coin.addEventListener('pointercancel', stopHold);
+  coin.addEventListener('contextmenu', e => e.preventDefault());
+
+  /* ================= АВТО-ДОХОД ================= */
+  setInterval(() => {
+    const rate = autoRate();
+    if (rate <= 0) return;
+    if (addMoney(rate / 10)) onLevelUp();
+    renderBalanceOnly();
+  }, 100);
+
+  /* ================= СОХРАНЕНИЕ ================= */
+  let saveTimer = null, cloudTimer = null;
+
+  function snapshot() {
+    S.ts = Date.now();
+    return JSON.stringify(S);
+  }
+
+  function save() {
+    try { localStorage.setItem(SAVE_KEY, snapshot()); } catch (e) {}
+    scheduleCloud();
+  }
+
+  function scheduleSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(save, 1200);
+  }
+
+  function scheduleCloud() {
+    if (!tg?.CloudStorage) return;
+    clearTimeout(cloudTimer);
+    cloudTimer = setTimeout(() => {
+      try { tg.CloudStorage.setItem(SAVE_KEY, snapshot(), () => {}); } catch (e) {}
+    }, 2500);
+  }
+
+  function applyLoaded(raw) {
+    try {
+      const d = JSON.parse(raw);
+      if (!d || typeof d !== 'object') return false;
+      if (!Number.isFinite(+d.bal) || !Number.isFinite(+d.totalEarned)) return false;
+
+      Object.assign(S, {
+        bal:         Math.max(0, +d.bal || 0),
+        tapLvl:      Math.max(1, +d.tapLvl || 1),
+        critLvl:     Math.min(CRIT_MAX, Math.max(0, +d.critLvl || 0)),
+        autoLvl:     Math.max(0, +d.autoLvl || 0),
+        totalEarned: Math.max(0, +d.totalEarned || 0),
+        ts:          +d.ts || Date.now()
+      });
+      recalcLevel();
+
+      // офлайн-доход: не больше 2 часов
+      const sec = Math.min(Math.max(0, (Date.now() - S.ts) / 1000), 7200);
+      const offline = autoRate() * sec;
+      if (offline > 0.5) addMoney(offline);
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function load() {
+    const pick = cloudRaw => {
+      const localRaw = localStorage.getItem(SAVE_KEY);
+      let best = localRaw;
+      try {
+        const l = JSON.parse(localRaw || 'null');
+        const c = JSON.parse(cloudRaw || 'null');
+        if (c && (!l || (+c.ts || 0) > (+l.ts || 0))) best = cloudRaw;
+      } catch (e) {}
+      if (best) applyLoaded(best);
+      render();
+    };
+
+    if (tg?.CloudStorage) {
+      try {
+        tg.CloudStorage.getItem(SAVE_KEY, (err, val) => pick(err ? null : val));
+      } catch (e) { pick(null); }
+    } else {
+      pick(null);
+    }
+  }
+
+  /* ================= ФОН ================= */
+  const PRESETS = [
+    { id: 'white',  name: 'Белый',  css: '#ffffff' },
+    { id: 'cream',  name: 'Крем',   css: 'linear-gradient(160deg,#fffdf5,#f5ecdb)' },
+    { id: 'ice',    name: 'Лёд',    css: 'linear-gradient(160deg,#f4f8ff,#e3edff)' },
+    { id: 'mint',   name: 'Мята',   css: 'linear-gradient(160deg,#f3fff9,#e0f6ea)' },
+    { id: 'sunset', name: 'Закат',  css: 'linear-gradient(160deg,#fff6ee,#ffe1dc)' }
+  ];
+
+  let bgState = { preset: 'white', image: null };
+
+  const bgEl = $('bg'), scrimEl = $('scrim');
+  const bgGrid = $('bgGrid'), uploadTile = $('uploadTile'), fileInput = $('fileInput');
+
+  function applyBg() {
+    if (bgState.image) {
+      bgEl.style.backgroundImage   = `url("${bgState.image}")`;
+      bgEl.style.backgroundColor   = '#ffffff';
+      scrimEl.classList.add('on');
+    } else {
+      const p = PRESETS.find(x => x.id === bgState.preset) || PRESETS[0];
+      const isGrad = p.css.startsWith('linear');
+      bgEl.style.backgroundImage = isGrad ? p.css : 'none';
+      bgEl.style.backgroundColor = isGrad ? '#ffffff' : p.css;
+      scrimEl.classList.remove('on');
+    }
+
+    document.querySelectorAll('.swatch[data-preset]').forEach(el => {
+      el.classList.toggle('sel', !bgState.image && el.dataset.preset === bgState.preset);
+    });
+    uploadTile.classList.toggle('sel', !!bgState.image);
+  }
+
+  function refreshUploadTile() {
+    if (bgState.image) {
+      uploadTile.style.backgroundImage = `url("${bgState.image}")`;
+      uploadTile.innerHTML = '<span class="up-hint" style="background:#fff;padding:2px 6px;border-radius:6px;">Сменить</span>';
+      uploadTile.appendChild(fileInput);
+    } else {
+      uploadTile.style.backgroundImage = 'none';
+      uploadTile.innerHTML = '<span class="up-plus">+</span><span class="up-hint">Свой фон</span>';
+      uploadTile.appendChild(fileInput);
+    }
+    applyBg();
+  }
+
+  function buildBgGrid() {
+    PRESETS.forEach(p => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'swatch';
+      b.dataset.preset = p.id;
+      b.title = p.name;
+      if (p.css.startsWith('linear')) b.style.backgroundImage = p.css;
+      else b.style.background = p.css;
+      b.addEventListener('click', () => {
+        bgState = { preset: p.id, image: null };
+        refreshUploadTile();
+        saveBg();
+        haptic.pick();
+      });
+      bgGrid.insertBefore(b, uploadTile);
+    });
+    applyBg();
+  }
+
+  function saveBg() {
+    try { localStorage.setItem(BG_KEY, JSON.stringify(bgState)); } catch (e) {}
+  }
+
+  function loadBg() {
+    try {
+      const raw = localStorage.getItem(BG_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      if (d && typeof d === 'object') {
+        bgState = {
+          preset: typeof d.preset === 'string' ? d.preset : 'white',
+          image: typeof d.image === 'string' ? d.image : null
+        };
+      }
+    } catch (e) {}
+  }
+
+  function handleFile(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1280;
+        let w = img.naturalWidth, h = img.naturalHeight;
+        const k = Math.min(1, MAX / Math.max(w, h));
+        w = Math.max(1, Math.round(w * k));
+        h = Math.max(1, Math.round(h * k));
+
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+
+        let q = 0.72;
+        let data = cv.toDataURL('image/jpeg', q);
+        while (data.length > 900000 && q > 0.32) {
+          q -= 0.1;
+          data = cv.toDataURL('image/jpeg', q);
+        }
+
+        bgState = { preset: bgState.preset, image: data };
+        refreshUploadTile();
+        saveBg();
+        haptic.win();
+      };
+      img.onerror = () => {};
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  fileInput.addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0];
+    if (f) handleFile(f);
+    e.target.value = '';
+  });
+
+  /* ================= МЕНЮ ================= */
+  const sheet = $('sheet'), backdrop = $('backdrop');
+
+  function openMenu() {
+    sheet.classList.add('on');
+    backdrop.classList.add('on');
+    haptic.pick();
+    if (!holding && activePointer === null) stopHold();
+  }
+  function closeMenu() {
+    sheet.classList.remove('on');
+    backdrop.classList.remove('on');
+  }
+
+  $('menuBtn').addEventListener('click', openMenu);
+  $('sheetClose').addEventListener('click', closeMenu);
+  backdrop.addEventListener('click', closeMenu);
+
+  $('resetBtn').addEventListener('click', () => {
+    if (!confirm('Сбросить весь прогресс? Монеты, уровни и прокачки обнулятся.')) return;
+    try {
+      localStorage.removeItem(SAVE_KEY);
+      localStorage.removeItem(BG_KEY);
+      tg?.CloudStorage?.removeItem?.(SAVE_KEY, () => {});
+    } catch (e) {}
+    location.reload();
+  });
+
+  /* ================= ЖИЗНЕННЫЙ ЦИКЛ ================= */
+  window.addEventListener('pagehide', save);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      stopHold();
+      save();
+    }
+  });
+
+  /* ================= СТАРТ ================= */
+  buildRunes();
+  buildShop();
+  buildBgGrid();
+  loadBg();
+  refreshUploadTile();
+
+  recalcLevel();
+  load();
+  render();
+})();
+</script>
+</body>
+</html>
